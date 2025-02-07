@@ -29,6 +29,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: bingosync-gen
+          bin: energy-calculator
           zip: windows
           token: ${{ secrets.GITHUB_TOKEN }}
