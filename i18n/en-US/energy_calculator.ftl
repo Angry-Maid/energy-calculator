@@ -1,0 +1,17 @@
+file = File
+quit = Quit
+language = Language
+spell-level = Spell Level
+action-type = Action Type
+action = Action
+bonus-action = Bonus Action
+reaction = Reaction
+components = Components
+verbal = Verbal
+somatic = Somatic
+material-component = Material Component
+dice = Dice
+amount = Amount
+type = Type
+additional-bonus = Additional Bonus
+result = Result

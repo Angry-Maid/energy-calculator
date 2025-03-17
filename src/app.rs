@@ -1,4 +1,15 @@
 use egui::TextStyle;
+use i18n_embed::{
+    LanguageLoader,
+    fluent::{FluentLanguageLoader, fluent_language_loader},
+};
+use i18n_embed_fl::fl;
+use log::info;
+use rust_embed::RustEmbed;
+
+#[derive(RustEmbed)]
+#[folder = "i18n/"]
+struct Localizations;
 
 #[derive(Default, PartialEq, Eq)]
 enum Action {
@@ -8,7 +19,7 @@ enum Action {
     Reaction,
 }
 
-#[derive(Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 enum BonusSign {
     Additive,
     #[default]
@@ -30,6 +41,7 @@ enum Dice {
 }
 
 pub struct Calculator {
+    localization_loader: FluentLanguageLoader,
     level: u32,
     action_variant: Action,
     verbal: bool,
@@ -45,7 +57,15 @@ pub struct Calculator {
 
 impl Default for Calculator {
     fn default() -> Self {
+        let loader: FluentLanguageLoader = fluent_language_loader!();
+        loader
+            .load_languages(&Localizations, &[loader.fallback_language().clone()])
+            .unwrap();
+
+        info!("{:?}", loader.available_languages(&Localizations));
+
         Self {
+            localization_loader: loader,
             level: 1,
             action_variant: Default::default(),
             verbal: true,
@@ -71,21 +91,17 @@ impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         let mut result: f64 = 1.0;
 
-        result *= self.level as f64;
+        result *= if self.level == 0 {
+            0.5
+        } else {
+            self.level as f64
+        };
         result *= if self.verbal { 20.0 } else { 1.0 };
         result *= if self.somatic { 30.0 } else { 1.0 };
         result *= match self.action_variant {
             Action::Action => 6.0,
             Action::BonusAction => 2.0,
             Action::Reaction => 0.5,
-        };
-        result = match self.material_sign {
-            BonusSign::Additive => result + self.material as f64,
-            BonusSign::Multiplicative => result * self.material as f64,
-        };
-        result = match self.bonus_sign {
-            BonusSign::Additive => result + self.bonus as f64,
-            BonusSign::Multiplicative => result * self.bonus as f64,
         };
         result *= match self.dice_type {
             Dice::None => 1.0,
@@ -97,12 +113,40 @@ impl eframe::App for Calculator {
             dice => dice as u32 as f64,
         };
 
-        self.result = format!("{}", result);
+        result = match self.material_sign {
+            BonusSign::Additive => result + self.material as f64,
+            BonusSign::Multiplicative => result * self.material as f64,
+        };
+
+        result = match self.bonus_sign {
+            BonusSign::Additive => result + self.bonus as f64,
+            BonusSign::Multiplicative => result * self.bonus as f64,
+        };
+
+        self.result = format!("{:.0}", result);
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
+                ui.menu_button(fl!(self.localization_loader, "file"), |ui| {
+                    ui.menu_button(fl!(self.localization_loader, "language"), |ui| {
+                        if ui.button("English").clicked() {
+                            i18n_embed::select(
+                                &self.localization_loader,
+                                &Localizations,
+                                &["en-US".parse().unwrap()],
+                            );
+                            ui.close_menu();
+                        }
+                        if ui.button("Русский").clicked() {
+                            i18n_embed::select(
+                                &self.localization_loader,
+                                &Localizations,
+                                &["ru-RU".parse().unwrap()],
+                            );
+                            ui.close_menu();
+                        }
+                    });
+                    if ui.button(fl!(self.localization_loader, "quit")).clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 });
@@ -112,6 +156,12 @@ impl eframe::App for Calculator {
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.horizontal(|ui| {
+                    ui.label(
+                        self.localization_loader
+                            .current_language()
+                            .language
+                            .as_str(),
+                    );
                     egui::warn_if_debug_build(ui);
                     ui.label(env!("CARGO_PKG_VERSION"));
                 });
@@ -123,38 +173,45 @@ impl eframe::App for Calculator {
                 egui::Layout::top_down(egui::Align::LEFT).with_cross_justify(true),
                 |ui| {
                     ui.horizontal(|ui| {
-                        ui.label("Level");
+                        ui.label(fl!(self.localization_loader, "spell-level"));
                         ui.add_space(ui.available_width() - 48.0);
-                        ui.add(egui::DragValue::new(&mut self.level).range(1..=11));
+                        ui.add(egui::DragValue::new(&mut self.level).range(0..=11));
                     });
                     ui.separator();
                     ui.vertical(|ui| {
-                        ui.label("Action Type");
+                        ui.label(fl!(self.localization_loader, "action-type"));
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut self.action_variant, Action::Action, "Action");
+                            ui.selectable_value(
+                                &mut self.action_variant,
+                                Action::Action,
+                                fl!(self.localization_loader, "action"),
+                            );
                             ui.selectable_value(
                                 &mut self.action_variant,
                                 Action::BonusAction,
-                                "Bonus Action",
+                                fl!(self.localization_loader, "bonus-action"),
                             );
                             ui.selectable_value(
                                 &mut self.action_variant,
                                 Action::Reaction,
-                                "Reaction",
+                                fl!(self.localization_loader, "reaction"),
                             );
                         });
                     });
                     ui.separator();
                     ui.vertical(|ui| {
-                        ui.label("Components");
+                        ui.label(fl!(self.localization_loader, "components"));
                         ui.horizontal(|ui| {
-                            ui.checkbox(&mut self.verbal, "Verbal");
-                            ui.checkbox(&mut self.somatic, "Somatic");
+                            ui.checkbox(&mut self.verbal, fl!(self.localization_loader, "verbal"));
+                            ui.checkbox(
+                                &mut self.somatic,
+                                fl!(self.localization_loader, "somatic"),
+                            );
                         });
                     });
                     ui.separator();
                     ui.horizontal(|ui| {
-                        ui.label("Material Component");
+                        ui.label(fl!(self.localization_loader, "material-component"));
                         ui.add_space(16.0);
 
                         ui.selectable_value(&mut self.material_sign, BonusSign::Additive, "+");
@@ -169,14 +226,14 @@ impl eframe::App for Calculator {
                     });
                     ui.separator();
                     ui.vertical(|ui| {
-                        ui.label("Dice");
+                        ui.label(fl!(self.localization_loader, "dice"));
                         ui.horizontal(|ui| {
-                            ui.label("Amount");
+                            ui.label(fl!(self.localization_loader, "amount"));
                             ui.add(egui::DragValue::new(&mut self.dice_amount));
 
                             ui.separator();
 
-                            egui::ComboBox::from_label("Type")
+                            egui::ComboBox::from_label(fl!(self.localization_loader, "type"))
                                 .selected_text(format!("{:?}", self.dice_type))
                                 .show_ui(ui, |ui| {
                                     ui.selectable_value(&mut self.dice_type, Dice::None, "None");
@@ -192,7 +249,7 @@ impl eframe::App for Calculator {
                     });
                     ui.separator();
                     ui.horizontal(|ui| {
-                        ui.label("Additional Bonus");
+                        ui.label(fl!(self.localization_loader, "additional-bonus"));
                         ui.add_space(38.0);
 
                         ui.selectable_value(&mut self.bonus_sign, BonusSign::Additive, "+");
@@ -203,7 +260,7 @@ impl eframe::App for Calculator {
                     });
                     ui.separator();
 
-                    ui.label("Result");
+                    ui.label(fl!(self.localization_loader, "result"));
 
                     ui.add_space(4.0);
 

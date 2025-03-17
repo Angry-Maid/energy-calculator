@@ -1,0 +1,17 @@
+file = Файл
+quit = Выйти
+language = Язык
+spell-level = Уровень Заклинания
+action-type = Тип Действия
+action = Действие
+bonus-action = Бонусное Действие
+reaction = Реакция
+components = Компоненты
+verbal = Вербальный
+somatic = Соматический
+material-component = Материальный
+dice = Куб
+amount = Кол-во
+type = Тип
+additional-bonus = Доп. бонус
+result = Результат
